@@ -38,7 +38,7 @@ const primaryHandler = (req, res) => {
       text: req.body.text || '',
     },
     // recipients: [req.body.to],
-    options: { sandbox: true }
+    // options: { sandbox: true }
   };
   const sparkPostRequest = {
     uri: 'https://api.sparkpost.com/api/v1/transmissions',
@@ -53,15 +53,56 @@ const primaryHandler = (req, res) => {
     if (error) {
       console.error(error);
     } else if (response.statusCode === 200) {
-      res.send('Email sent!')
+      res.send('Email sent via Sparkpost!')
     } else {
       backupHandler(req, res);
     }
   });
 }
 
-// const backupHandler = (req, res) => {
-
+const backupHandler = (req, res) => {
+  const requestBody = {
+    personalizations: [
+      {
+        to: [
+          {
+            email: req.body.to
+          }
+        ] 
+      }
+    ],
+    from: {
+      email: req.body.from
+    },
+    subject: req.body.subject || '(no subject)',
+    content: [
+      {
+        type: 'text/plain',
+        value: req.body.text || ''
+      }
+    ]
+  }
+  const requestObject = {
+    uri: 'https://api.sendgrid.com/v3/mail/send',
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.SENDGRID_API}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(requestBody)
+  }
+  request(requestObject, (error, response, body) => {
+    if (error) {
+      console.error(error);
+      res.status(500).send('Error on line 95')
+    } else if (response.statusCode === 202) {
+      res.send('Email sent via Sendgrid!')
+    } else {
+      console.log(`Status code from Sendgrid: ${response.statusCode}`)
+      console.log(body)
+      res.status(500).send('Something went wrong with both email providers.')
+    }
+  })
 }
 
 // Listen!
