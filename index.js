@@ -5,6 +5,9 @@ const bodyParser = require('body-parser');
 const morgan = require('morgan');
 const request = require('request');
 
+const backupProvider = require('./providers/sendgrid');
+const primaryProvider = require('./providers/sparkpost');
+
 // config
 
 const port = process.env.PORT || 8080;
@@ -26,108 +29,31 @@ app.post('/sendmail', (req, res) => {
   if (!body.to || !body.from) {
     res.status(400).send('Missing information')
   } else {
-    primaryHandler(req, res);
+    sendmailHandler(req, res);
   }
 })
 
-const primaryHandler = (req, res) => {
-  const mailObject = {
-    content: {
-      from: req.body.from,
-      subject: req.body.subject || '',
-      text: req.body.text || '',
-    },
-    // recipients: [req.body.to],
-    // options: { sandbox: true }
-  };
-  const sparkPostRequest = {
-    uri: 'https://api.sparkpost.com/api/v1/transmissions',
-    headers: JSON.stringify({
-      'Authorization': process.env.SPARKPOST_API,
-      'Content-Type': 'application/json'
-    }),
-    method: 'POST',
-    body: JSON.stringify(mailObject),
-  };
-  request(sparkPostRequest, (error, response, body) => {
+const sendmailHandler = (req, res) => {
+  const responseCallback = (error, success) => {
     if (error) {
       console.error(error);
-    } else if (response.statusCode === 200) {
-      res.send('Email sent via Sparkpost!')
+      res.status(500).send('Email not sent due to an error.')
     } else {
-      backupHandler(req, res);
+      res.send(success);
     }
-  });
-}
-
-const backupHandler = (req, res) => {
-  const requestBody = {
-    personalizations: [
-      {
-        to: [
-          {
-            email: req.body.to
-          }
-        ] 
-      }
-    ],
-    from: {
-      email: req.body.from
-    },
-    subject: req.body.subject || '(no subject)',
-    content: [
-      {
-        type: 'text/plain',
-        value: req.body.text || ''
-      }
-    ]
   }
-  const requestObject = {
-    uri: 'https://api.sendgrid.com/v3/mail/send',
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.SENDGRID_API}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(requestBody)
-  }
-  request(requestObject, (error, response, body) => {
+  primaryProvider(req.body, (error, result) => {
     if (error) {
-      console.error(error);
-      res.status(500).send('Error on line 95')
-    } else if (response.statusCode === 202) {
-      res.send('Email sent via Sendgrid!')
+      backupProvider(req.body, responseCallback);
     } else {
-      console.log(`Status code from Sendgrid: ${response.statusCode}`)
-      console.log(body)
-      res.status(500).send('Something went wrong with both email providers.')
+      responseCallback(null, result);
     }
   })
 }
+
 
 // Listen!
 
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`);
 })
-
-/** a successful Sparkpost request
-{
-  "options": {
-    "sandbox": true
-  },
-  "content": {
-    "from": "localpart@sparkpostbox.com",
-    "subject": "testing",
-    "text": "this is a test"
-  },
-  "recipients": [
-    {
-      "address": {
-        "email": "leogomez@gmail.com",
-        "name": "Leo Gomez"
-      }
-    }
-  ]
-}
-*/
