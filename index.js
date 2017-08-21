@@ -26,7 +26,7 @@ app.get('/', (req, res) => {
 
 app.post('/sendmail', (req, res) => {
   const body = req.body;
-  if (!body.to || !body.from) {
+  if (!body.to || !body.from || !body.subject || !body.text) {
     res.status(400).send('Missing information')
   } else {
     sendmailHandler(req, res);
