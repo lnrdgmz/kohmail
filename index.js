@@ -21,7 +21,7 @@ app.use(morgan('dev'))
 // Routes
 
 app.get('/', (req, res) => {
-  res.send('Hello, kohactive!');
+  res.send('See README for instructions on how to use this API');
 })
 
 app.post('/sendmail', (req, res) => {
